@@ -273,15 +273,15 @@ def display_results(prompt_name: str, scores: Dict[str, float]) -> bool:
 def main():
     print_section_header("AVALIAÇÃO DE PROMPTS OTIMIZADOS")
 
-    provider = os.getenv("LLM_PROVIDER", "openai")
-    llm_model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-    eval_model = os.getenv("EVAL_MODEL", "gpt-4o")
+    provider = os.getenv("LLM_PROVIDER", "google")
+    llm_model = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+    eval_model = os.getenv("EVAL_MODEL", "gemini-2.5-flash")
 
-    print(f"Provider: {provider}")
+    print(f"Provider: {provider}")  
     print(f"Modelo Principal: {llm_model}")
     print(f"Modelo de Avaliação: {eval_model}\n")
 
-    required_vars = ["LANGSMITH_API_KEY", "LLM_PROVIDER"]
+    required_vars = ["LANGSMITH_API_KEY", "LLM_PROVIDER", "LLM_MODEL", "EVAL_MODEL", "GOOGLE_API_KEY", "LANGSMITH_PROJECT"]
     if provider == "openai":
         required_vars.append("OPENAI_API_KEY")
     elif provider in ["google", "gemini"]:
@@ -291,7 +291,7 @@ def main():
         return 1
 
     client = Client()
-    project_name = os.getenv("LANGCHAIN_PROJECT", "prompt-optimization-challenge-resolved")
+    project_name = os.getenv("LANGSMITH_PROJECT", "prompt-optimization-challenge-resolved")
 
     jsonl_path = "datasets/bug_to_user_story.jsonl"
 
@@ -311,7 +311,8 @@ def main():
     print("  python src/push_prompts.py\n")
 
     prompts_to_evaluate = [
-        "bug_to_user_story_v2",
+        "bug_to_user_story_v1",
+        "bug_to_user_story_v2"
     ]
 
     all_passed = True
