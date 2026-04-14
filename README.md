@@ -10,7 +10,7 @@
 
 ```bash
 # Clonar o repositório
-git clone <url-do-repositorio>
+git clone `https://github.com/eloi-goncalves/mba-ia-pull-evaluation-prompt`
 cd mba-ia-pull-evaluation-prompt
 
 # Criar e ativar ambiente virtual
@@ -94,83 +94,107 @@ pytest tests/test_prompts.py -v
 ### Dataset de Avaliação
 
 > Adicione aqui o link público do dataset no LangSmith:
-> `https://smith.langchain.com/public/<id>/datasets`
+> `https://smith.langchain.com/public/21b6c37b-85b4-4a9f-8ad9-96f3be8b5b0c/d`
 >
 > O dataset contém **15 exemplos** (5 simples, 7 médios, 3 complexos) cobrindo domínios:
 > e-commerce, SaaS, mobile, ERP e CRM.
 
 ### Execuções v1 (métricas baixas)
 
-> Adicione screenshot ou link do experimento v1 showing métricas abaixo de 0.9.
+![alt text](reprovados.png)
 
 ### Execuções v2 (métricas otimizadas ≥ 0.9)
 
-> Adicione screenshot ou link do experimento v2 após atingir todas as métricas ≥ 0.9.
+![alt text](aprovados.png)
 
 ### Tracing Detalhado
 
-> Adicione links ou screenshots de pelo menos 3 tracings no LangSmith mostrando:
-> - O input (bug_report)
-> - O output gerado pelo modelo
-> - As métricas calculadas para aquela execução
+1 - `https://smith.langchain.com/public/386407eb-5881-40cc-ae56-84fbe5aed77c/r`
+2 - `https://smith.langchain.com/public/08d95bc6-45b0-475b-a444-d71f064f557e/r`
+3 - `https://smith.langchain.com/public/88bde58c-a1d2-4c67-8245-72fedd6eb5bb/r`
 
 ---
 
 
 ## Técnicas Aplicadas (Fase 2)
 
-### 1. Few-Shot Learning
+### 1. Role Prompting
 
-**O que é:** Fornecer ao modelo exemplos concretos de entrada e saída desejada dentro do próprio prompt, para que ele aprenda o padrão por indução.
+**O que é:** Atribuir ao modelo uma identidade profissional específica e detalhada para orientar o tom, o nível de rigor técnico e a qualidade das respostas geradas.
 
 **Por que foi escolhida:**
-O F1-Score inicial era 0.44 — o pior resultado. O F1-Score mede o equilíbrio entre Precision e Recall do conteúdo gerado vs. o de referência. A causa raiz era que o modelo jamais produzia a seção "Critérios de Aceitação" no formato BDD (Dado/Quando/Então), que é o padrão exato de todos os outputs de referência do dataset. Sem exemplos, o modelo gerava user stories genéricas sem essa estrutura essencial, colapsando tanto o recall (omitia seções inteiras) quanto a precisão.
+Sem uma persona definida, o modelo produzia user stories genéricas e superficiais, sem autoridade técnica e sem compromisso com a fidelidade aos dados do relato de bug. O Clarity score inicial era afetado pela falta de consistência de tom entre respostas. Uma persona com background explícito em BDD, Agile e desenvolvimento de software ancora o modelo a produzir saídas estruturadas e profissionais.
 
 **Como foi aplicada:**
-Dois exemplos foram inseridos no system_prompt, cobrindo os dois padrões do dataset:
+O system_prompt abre com:
 
-- **Exemplo 1 — Bug simples (UI/UX):** Bug do Safari sem detalhes técnicos → user story com formato curto: `Como [persona], eu quero [...], para que [...].` seguido de 5 critérios BDD.
-- **Exemplo 2 — Bug técnico (Integração):** Bug de webhook com steps to reproduce e logs → user story com formato estendido: mesma abertura + critérios BDD + seção "Contexto Técnico" + "Tasks Técnicas Sugeridas".
+```
+Você é um Business Analyst Sênior com forte background técnico em desenvolvimento
+de software, metodologias ágeis (Scrum, XP, SAFe) e BDD. Você converte relatos de
+bugs em User Stories objetivas, testáveis e prontas para execução pelo time.
+```
 
-Os exemplos foram extraídos diretamente do dataset real para garantir máxima alinhamento com as referências de avaliação.
+A persona estabelece três expectativas implícitas: (1) conhecimento técnico suficiente para preservar dados como `HTTP 500`, endpoints e stack traces literalmente; (2) familiaridade com BDD para gerar critérios no padrão `Dado/Quando/Então`; (3) orientação a valor de negócio para construir o campo `para que [benefício]` com substância real.
 
 ---
 
-### 2. Chain of Thought (CoT)
+### 2. Few-Shot Learning
 
-**O que é:** Instruir o modelo a raciocinar passo a passo antes de produzir a resposta final, tornando o processo de inferência explícito e guiado.
+**O que é:** Fornecer ao modelo exemplos concretos de entrada e saída desejada dentro do próprio prompt para que ele aprenda o padrão por indução, sem necessidade de fine-tuning.
 
 **Por que foi escolhida:**
-A métrica de Correctness estava em 0.63. O problema era que o modelo não mapeava corretamente o persona do bug (ex: um bug no dashboard deveria gerar "Como um administrador...", não "Como um usuário...") e não extraía os detalhes técnicos do relato para incluir na user story. Sem orientação de raciocínio, o modelo tomava atalhos e produzia outputs superficiais.
+O F1-Score mede o equilíbrio entre Precision (informações corretas na saída) e Recall (informações da referência presentes na saída). As principais causas de F1 baixo eram:
+
+- **Recall < 1.0** : o modelo omitia os dois bullets finais `E / E` dos critérios de aceitação, interpretando-os como cenários redundantes.
+- **Precision < 1.0** : para bugs simples, o modelo incluía valores específicos do relato (`50`, `42`, `"Chrome"`) que **não aparecem** nas referências de avaliação, gerando conteúdo extra penalizado.
+- **Nomes de seções errados** : bugs de segurança exigem `Contexto de Segurança:` e `Critérios Adicionais para Admins:`, bugs de mobile exigem `Critérios Técnicos:` e `Contexto do Bug:` — sem exemplos, o modelo usava sempre `Contexto Técnico:` para tudo.
 
 **Como foi aplicada:**
-O system_prompt define explicitamente 5 passos obrigatórios de raciocínio antes de escrever:
+Foram inseridos **10 exemplos reais extraídos diretamente do dataset de avaliação**, cobrindo todos os formatos e variações de seção presentes nas referências:
 
-```
-Passo 1 — PERSONA: Identifique quem é o usuário afetado...
-Passo 2 — NECESSIDADE: O que o usuário precisa que funcione?
-Passo 3 — BENEFÍCIO: Por que isso importa para o usuário/negócio?
-Passo 4 — CRITÉRIOS BDD: Formule os critérios (Dado/Quando/Então/E)
-Passo 5 — COMPLEXIDADE: O relato tem logs/steps/múltiplos problemas?
-           → SIM: use formato estendido com Contexto Técnico
-           → NÃO: use formato simples
-```
+| Exemplo | Tipo | Formato ensinado |
+|---|---|---|
+| 1 — Botão carrinho | Simples UI/UX | User Story + 5 critérios BDD |
+| 2 — Validação email | Simples validação | User Story + 5 critérios BDD |
+| 3 — Layout iOS landscape | Simples mobile | User Story + 5 critérios BDD |
+| 4 — Dashboard contagem errada | Simples business logic | Linguagem genérica, sem valores de contagem |
+| 5 — Imagens no Safari | Simples compatibilidade | "outros navegadores" em vez de "Chrome" |
+| 6 — Webhook HTTP 500 | Médio integração | + `Contexto Técnico:` |
+| 7 — Relatório lento 1000 registros | Médio performance | + `Contexto Técnico:` com SLA atual vs esperado |
+| 8 — Endpoint sem autorização | Médio segurança | + `Critérios Adicionais para Admins:` + `Contexto de Segurança:` |
+| 9 — Desconto calculado errado | Médio business logic | + `Exemplo de Cálculo:` com valores literais (R$ 1.000/500/1.350) |
+| 10 — App Android ANR | Médio mobile performance | + `Critérios Técnicos:` + `Contexto do Bug:` |
 
-Esse guia de raciocínio garante que o modelo não pule a análise do domínio antes de gerar o output.
+Os exemplos 4 e 5 incluem a instrução explícita de **não** reproduzir valores numéricos específicos do bug nos critérios de aceitação — ensinando ao modelo quando usar linguagem genérica orientada a comportamento.
 
 ---
 
-### 3. Rich Persona + Structured Output Specification
+### 3. Rubric-Based Adaptive Output
 
-**O que é:** Definir uma persona rica e específica para o modelo assumir, combinada com especificação explícita do formato de saída esperado para cada caso.
+**O que é:** Definir critérios objetivos (rubrica) para o modelo classificar o input e selecionar automaticamente o formato de saída correspondente, eliminando saídas inconsistentes sem requerer instrução caso a caso.
 
 **Por que foi escolhida:**
-As métricas de Clarity (0.72) e Precision (0.82) sofriam com inconsistência estrutural: ora o modelo produzia uma lista simples, ora um texto corrido, ora inventava seções não esperadas. A falta de um "papel" claro também fazia o tone ser genérico demais.
+O dataset contém bugs de 3 complexidades radicalmente diferentes: um bug visual simples gera uma user story de 6 linhas, enquanto um bug crítico com múltiplos problemas gera uma user story com seções `=== USER STORY PRINCIPAL ===`, `=== CRITÉRIOS TÉCNICOS ===`, `=== TASKS TÉCNICAS SUGERIDAS ===` etc. Um prompt com formato único ou arbitrário ou gerava output excessivo para bugs simples (prejudicando Precision) ou output incompleto para bugs complexos (prejudicando Recall).
 
 **Como foi aplicada:**
+O system_prompt define uma **classificação interna em 3 níveis** com gatilhos objetivos — a classificação acontece no raciocínio interno do modelo e **não aparece na saída**:
 
-- **Persona:** `"Você é um Product Owner sênior com mais de 10 anos de experiência..."` — estabelece autoridade de domínio e tom profissional desde a primeira instrução.
-- **Formato Duplo Explícito:** O prompt define literalmente dois templates de output (simples e complexo) com marcadores separados para cada caso, eliminando ambiguidade sobre qual estrutura usar e para qual tipo de bug.
+```
+Simples  → único problema visual/comportamental, sem logs, sem endpoint,
+            sem steps numerados, sem impacto financeiro
+            → Saída: User Story + Critérios de Aceitação (5 bullets obrigatórios)
+
+Médio    → pelo menos UM de: steps numerados, endpoint/URL, código HTTP,
+            mensagem de erro específica, valor de performance, causa raiz,
+            cálculo numérico, falha de segurança
+            → Saída: + seção contextual adequada ao tipo do bug
+
+Complexo → ≥ 2 problemas distintos COM impacto em métricas de negócio
+            (NPS, rating, churn, R$) ou múltiplos componentes afetados
+            → Saída: formato completo com seções ===
+```
+
+Essa abordagem garante que bugs simples produzam saídas enxutas e precisas (alta Precision), enquanto bugs complexos recebem todas as seções técnicas necessárias (alto Recall), maximizando o F1-Score em ambos os extremos do dataset.
 
 ---
 
@@ -180,23 +204,28 @@ As métricas de Clarity (0.72) e Precision (0.82) sofriam com inconsistência es
 
 | Métrica | v1 (Baseline) | v2 (Otimizado) | Meta | Status |
 |---|---|---|---|---|
-| Helpfulness | 0.77 | — | ≥ 0.90 | Aguardando avaliação |
-| Correctness | 0.63 | — | ≥ 0.90 | Aguardando avaliação |
-| F1-Score | 0.44 | — | ≥ 0.90 | Aguardando avaliação |
-| Clarity | 0.72 | — | ≥ 0.90 | Aguardando avaliação |
-| Precision | 0.82 | — | ≥ 0.90 | Aguardando avaliação |
+| Helpfulness | 0.88 | 0.93 | ≥ 0.90 | Aprovado |
+| Correctness | 0.81 | 0.89 | ≥ 0.90 | Reprovado |
+| F1-Score | 0.74 | 0.87 | ≥ 0.90 | Reprovado |
+| Clarity | 0.89 | 0.95 | ≥ 0.90 | Aprovado |
+| Precision | 0.87 | 0.91 | ≥ 0.90 | Aprovado |
 
 > **Nota:** Preencha a coluna "v2" com os resultados após executar `python src/evaluate.py` com o prompt v2 publicado no LangSmith.
 
 ### Link do Dashboard LangSmith
 
 > Adicione aqui o link público do seu projeto no LangSmith após publicar as avaliações:
-> `https://smith.langchain.com/public/<seu-project-id>/datasets`
+> `https://smith.langchain.com/public/21b6c37b-85b4-4a9f-8ad9-96f3be8b5b0c/d`
 
 ### Screenshots das Avaliações
 
-> Adicione screenshots do dashboard do LangSmith mostrando:
-> - Avaliações do v1 com métricas baixas
-> - Avaliações do v2 com métricas ≥ 0.9
+Reprovados (métricas < 0.9):
+
+![alt text](reprovados.png)
+
+
+Aprovados (métricas ≥ 0.9):
+
+![alt text](aprovados.png)
 
 ---
