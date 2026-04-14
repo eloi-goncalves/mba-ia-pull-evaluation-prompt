@@ -38,7 +38,7 @@ LLM_MODEL=gpt-4o-mini
 EVAL_MODEL=gpt-4o
 
 # Se usar OpenAI
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=
 
 # Se usar Google Gemini
 # LLM_PROVIDER=google
@@ -94,7 +94,7 @@ pytest tests/test_prompts.py -v
 ### Dataset de Avaliação
 
 > Adicione aqui o link público do dataset no LangSmith:
-> `https://smith.langchain.com/public/21b6c37b-85b4-4a9f-8ad9-96f3be8b5b0c/d`
+[Link](https://smith.langchain.com/public/21b6c37b-85b4-4a9f-8ad9-96f3be8b5b0c/d)
 >
 > O dataset contém **15 exemplos** (5 simples, 7 médios, 3 complexos) cobrindo domínios:
 > e-commerce, SaaS, mobile, ERP e CRM.
@@ -109,9 +109,9 @@ pytest tests/test_prompts.py -v
 
 ### Tracing Detalhado
 
-1 - `https://smith.langchain.com/public/386407eb-5881-40cc-ae56-84fbe5aed77c/r`
-2 - `https://smith.langchain.com/public/08d95bc6-45b0-475b-a444-d71f064f557e/r`
-3 - `https://smith.langchain.com/public/88bde58c-a1d2-4c67-8245-72fedd6eb5bb/r`
+1 - https://smith.langchain.com/public/386407eb-5881-40cc-ae56-84fbe5aed77c/r
+2 - https://smith.langchain.com/public/08d95bc6-45b0-475b-a444-d71f064f557e/r
+3 - https://smith.langchain.com/public/88bde58c-a1d2-4c67-8245-72fedd6eb5bb/r
 
 ---
 
@@ -215,7 +215,7 @@ Essa abordagem garante que bugs simples produzam saídas enxutas e precisas (alt
 ### Link do Dashboard LangSmith
 
 > Adicione aqui o link público do seu projeto no LangSmith após publicar as avaliações:
-> `https://smith.langchain.com/public/21b6c37b-85b4-4a9f-8ad9-96f3be8b5b0c/d`
+[Link](https://smith.langchain.com/public/21b6c37b-85b4-4a9f-8ad9-96f3be8b5b0c/d)
 
 ### Screenshots das Avaliações
 
